@@ -1,11 +1,3 @@
-document.addEventListener('DOMContentLoaded', () => {
-    const canvas = document.getElementById('gameCanvas');
-    const ctx = canvas.getContext('2d');
-
-    // DOM Elements
-    const playerScoreEl = document.getElementById('player-score');
-    const cpuScoreEl = document.getElementById('cpu-score');
-    const pauseButton = document.getElementById('pause-button');
     const restartButton = document.getElementById('restart-button');
 
     // Game state
@@ -13,6 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let cpuScore = 0;
     let paused = false;
     let gameOver = false;
+    let gameStarted = false; // To show instructions
 
     // Court dimensions
     const court = {
@@ -32,7 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
         vx: 0, // velocity x
         vy: 0, // velocity y
         vz: 0, // velocity z (for height)
-        gravity: -0.25,
+        gravity: -0.15, // Slower gravity
         color: 'white'
     };
 
@@ -94,9 +87,21 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.strokeStyle = '#ccc';
         ctx.stroke();
     }
+    
+    function drawInstructions() {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = 'white';
+        ctx.font = '20px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('左右にスワイプして', canvas.width / 2, canvas.height / 2 - 20);
+        ctx.fillText('ボールを打ち返そう！', canvas.width / 2, canvas.height / 2 + 10);
+        ctx.font = '16px sans-serif';
+        ctx.fillText('(タップでスタート)', canvas.width / 2, canvas.height / 2 + 50);
+    }
 
     function update() {
-        if (paused || gameOver) return;
+        if (paused || gameOver || !gameStarted) return;
 
         // Ball physics
         ball.vz += ball.gravity;
@@ -107,7 +112,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Ball hits the ground
         if (ball.z < 0) {
             ball.z = 0;
-            ball.vz *= -0.8; // Bounce
+            ball.vz *= -0.7; // Bounce
 
             if (ball.y > court.netY) { // Player's side
                 pointScored('cpu');
@@ -125,7 +130,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Ball hits net
-        if (ball.y > court.netY - 5 && ball.y < court.netY + 5 && ball.z < 50) {
+        if (ball.y > court.netY - 5 && ball.y < court.netY + 5 && ball.z < 40) { // Net is a bit higher
             ball.vy *= -1;
             ball.y += ball.vy;
         }
@@ -151,17 +156,17 @@ document.addEventListener('DOMContentLoaded', () => {
         if (distance < p.radius + ball.radius && ball.z < 30) {
             // Hit the ball
             const angle = Math.atan2(dy, dx);
-            const speed = 5;
+            const speed = 3.5; // Slower ball speed
             ball.vx = Math.cos(angle) * speed;
             ball.vy = Math.sin(angle) * speed;
-            ball.vz = 8; // Pop the ball up
+            ball.vz = 6; // Lower pop up
         }
     }
 
     function updateCpuAi() {
         // Simple AI: move towards the ball's x position
         const targetX = ball.x;
-        cpu.x += (targetX - cpu.x) * 0.08;
+        cpu.x += (targetX - cpu.x) * 0.07; // Slower CPU reaction
 
         // Clamp CPU position
         cpu.x = Math.max(cpu.radius + court.x, Math.min(cpu.x, court.x + court.width - cpu.radius));
@@ -181,18 +186,18 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function resetBall(server) {
-        ball.z = 100;
+        ball.z = 80;
         ball.vz = 0;
-        ball.vx = (Math.random() - 0.5) * 4;
+        ball.vx = (Math.random() - 0.5) * 3; // Slower serve speed
 
         if (server === 'player') {
             ball.x = player.x;
             ball.y = player.y - player.radius - 10;
-            ball.vy = -5; // Serve forward
+            ball.vy = -4; // Slower serve forward
         } else {
             ball.x = cpu.x;
             ball.y = cpu.y + cpu.radius + 10;
-            ball.vy = 5; // Serve forward
+            ball.vy = 4; // Slower serve forward
         }
     }
 
@@ -206,6 +211,10 @@ document.addEventListener('DOMContentLoaded', () => {
         drawCpu();
         drawBall();
         
+        if (!gameStarted) {
+            drawInstructions();
+        }
+
         if (paused) {
             ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -219,6 +228,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Event Listeners ---
     function handleTouchMove(e) {
         e.preventDefault();
+        if (!gameStarted) return;
         const rect = canvas.getBoundingClientRect();
         const touch = e.touches[0];
         const touchX = touch.clientX - rect.left;
@@ -229,11 +239,20 @@ document.addEventListener('DOMContentLoaded', () => {
         // Clamp player position to their side of the court
         player.x = Math.max(player.radius + court.x, Math.min(player.x, court.x + court.width - player.radius));
     }
+    
+    function handleCanvasClick() {
+        if (!gameStarted) {
+            gameStarted = true;
+            resetBall('player');
+            update();
+        }
+    }
 
+    canvas.addEventListener('click', handleCanvasClick);
     canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
     canvas.addEventListener('mousemove', (e) => {
         // Also allow mouse control for desktop
-        if (e.buttons === 1) { // if left mouse button is held down
+        if (e.buttons === 1 && gameStarted) { // if left mouse button is held down
             const rect = canvas.getBoundingClientRect();
             player.x = e.clientX - rect.left;
             player.x = Math.max(player.radius + court.x, Math.min(player.x, court.x + court.width - player.radius));
@@ -241,6 +260,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     pauseButton.addEventListener('click', () => {
+        if (!gameStarted) return;
         paused = !paused;
         pauseButton.textContent = paused ? '再開' : '一時停止';
         if (!paused) {
@@ -255,12 +275,15 @@ document.addEventListener('DOMContentLoaded', () => {
         cpuScoreEl.textContent = cpuScore;
         paused = false;
         gameOver = false;
+        gameStarted = true; // Go directly into the game
         pauseButton.textContent = '一時停止';
         resetBall('player');
-        update();
+        if (!paused) {
+             update();
+        }
     });
 
     // --- Initial Start ---
-    resetBall('player');
-    update();
+    render();
+    drawInstructions();
 });
