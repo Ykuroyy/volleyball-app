@@ -1,19 +1,74 @@
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+}
+
 body {
     display: flex;
-    flex-direction: column;
     align-items: center;
     justify-content: center;
     height: 100vh;
-    margin: 0;
-    background-color: #f0f8ff; /* 明るい青空のような色 */
-    font-family: sans-serif;
+    background-color: #333;
+    font-family: 'Helvetica Neue', sans-serif;
+    touch-action: none; /* Disable double-tap to zoom */
 }
 
-h1 {
-    color: #ff69b4; /* ポップなピンク */
+#game-container {
+    width: 320px;
+    display: flex;
+    flex-direction: column;
+    border: 2px solid #fff;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+#scoreboard {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    background-color: #111;
+    color: #fff;
+    padding: 8px;
+    font-weight: bold;
+}
+
+.team-name {
+    font-size: 16px;
+    color: #aaa;
+}
+
+.score {
+    font-size: 24px;
+    color: #fdd835; /* Yellow for score */
+    min-width: 40px;
+    text-align: center;
 }
 
 canvas {
-    border: 2px solid #333;
-    background-color: #fff;
+    display: block;
+    background-color: #4a90e2; /* Blue court color */
+}
+
+#controls {
+    display: flex;
+    justify-content: space-around;
+    background-color: #111;
+    padding: 10px;
+}
+
+button {
+    background-color: #444;
+    color: #fff;
+    border: 1px solid #666;
+    border-radius: 5px;
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+button:hover {
+    background-color: #555;
 }

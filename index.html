@@ -2,13 +2,24 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>バレーボールイメトレ</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>バレーボールゲーム</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h1>バレーボール イメトレ</h1>
-    <canvas id="gameCanvas" width="300" height="500"></canvas>
+    <div id="game-container">
+        <div id="scoreboard">
+            <div class="team-name">YOU</div>
+            <div id="player-score" class="score">0</div>
+            <div class="team-name">CPU</div>
+            <div id="cpu-score" class="score">0</div>
+        </div>
+        <canvas id="gameCanvas" width="320" height="480"></canvas>
+        <div id="controls">
+            <button id="pause-button">一時停止</button>
+            <button id="restart-button">リスタート</button>
+        </div>
+    </div>
     <script src="script.js"></script>
 </body>
 </html>
