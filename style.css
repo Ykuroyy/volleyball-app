@@ -1,0 +1,19 @@
+body {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    margin: 0;
+    background-color: #f0f8ff; /* 明るい青空のような色 */
+    font-family: sans-serif;
+}
+
+h1 {
+    color: #ff69b4; /* ポップなピンク */
+}
+
+canvas {
+    border: 2px solid #333;
+    background-color: #fff;
+}
