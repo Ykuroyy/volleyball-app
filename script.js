@@ -178,9 +178,6 @@ document.addEventListener('DOMContentLoaded', () => {
             ball.y += ball.vy;
         }
 
-        // CPU logic
-        updateCpuAi();
-
         // Collision checks
         handleCollisions();
     }
