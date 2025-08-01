@@ -1,3 +1,4 @@
+
 document.addEventListener('DOMContentLoaded', () => {
     const canvas = document.getElementById('gameCanvas');
     const ctx = canvas.getContext('2d');
@@ -14,7 +15,8 @@ document.addEventListener('DOMContentLoaded', () => {
         cpuScore: 0,
         paused: false,
         roundOver: false,
-        gameStarted: false
+        gameStarted: false,
+        gameState: 'serve' // 'serve', 'rally', 'playerToss', 'playerAttack', 'cpuToss', 'cpuAttack'
     };
 
     // Court dimensions
@@ -37,37 +39,59 @@ document.addEventListener('DOMContentLoaded', () => {
         color: 'white'
     };
 
-    // Player & CPU properties
-    const player = { x: canvas.width / 2, y: court.y + court.height * 0.75, radius: 15, color: '#ff3b30' };
-    const cpu = { x: canvas.width / 2, y: court.y + court.height * 0.25, radius: 15, color: '#007aff' };
+    // Player, Setter, Attacker properties
+    const player = { id: 'player', x: canvas.width / 2, y: court.y + court.height * 0.85, radius: 15, color: '#ff3b30', role: 'receiver' };
+    const setter = { id: 'setter', x: canvas.width * 0.7, y: court.y + court.height * 0.6, radius: 14, color: '#ff9500' };
+    const attacker = { id: 'attacker', x: canvas.width * 0.3, y: court.y + court.height * 0.6, radius: 16, color: '#ff2d55' };
+
+    const cpu = { id: 'cpu', x: canvas.width / 2, y: court.y + court.height * 0.25, radius: 15, color: '#007aff' };
+    const cpuSetter = { id: 'cpuSetter', x: canvas.width * 0.7, y: court.y + court.height * 0.4, radius: 14, color: '#5856d6' };
+
 
     // --- Drawing Functions ---
     function drawCourt() {
         ctx.strokeStyle = 'white';
         ctx.lineWidth = 2;
         ctx.strokeRect(court.x, court.y, court.width, court.height);
+        // Net
         ctx.beginPath();
         ctx.moveTo(court.x, court.netY);
         ctx.lineTo(court.x + court.width, court.netY);
+        ctx.strokeStyle = '#aaa';
         ctx.stroke();
+        // Net posts
+        for(let i = 0; i < 10; i++) {
+            ctx.beginPath();
+            ctx.moveTo(court.x + (i * court.width/10), court.netY);
+            ctx.lineTo(court.x + (i * court.width/10), court.netY - 30);
+            ctx.stroke();
+        }
     }
 
-    function drawPlayers() {
-        [player, cpu].forEach(p => {
+    function drawTeam() {
+        [player, setter, attacker, cpu, cpuSetter].forEach(p => {
             ctx.beginPath();
             ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
             ctx.fillStyle = p.color;
             ctx.fill();
+            // Role indicator for player
+            if (p.id === player.id) {
+                ctx.fillStyle = 'white';
+                ctx.font = '10px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(player.role === 'receiver' ? 'R' : 'A', p.x, p.y + 4);
+            }
         });
     }
 
     function drawBall() {
+        // Shadow
         const shadowRadius = ball.radius * (1 + ball.z / 100);
         ctx.beginPath();
         ctx.arc(ball.x, ball.y, shadowRadius, 0, Math.PI * 2);
         ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
         ctx.fill();
-
+        // Ball
         ctx.beginPath();
         ctx.arc(ball.x, ball.y - ball.z, ball.radius, 0, Math.PI * 2);
         ctx.fillStyle = ball.color;
@@ -83,10 +107,7 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.fillStyle = 'white';
             ctx.font = '20px sans-serif';
             ctx.textAlign = 'center';
-            ctx.fillText('左右にスワイプして', canvas.width / 2, canvas.height / 2 - 20);
-            ctx.fillText('ボールを打ち返そう！', canvas.width / 2, canvas.height / 2 + 10);
-            ctx.font = '16px sans-serif';
-            ctx.fillText('(タップでスタート)', canvas.width / 2, canvas.height / 2 + 50);
+            ctx.fillText('タップしてゲーム開始', canvas.width / 2, canvas.height / 2);
         } else if (state.paused) {
             ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
@@ -96,61 +117,183 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.fillText('一時停止中', canvas.width / 2, canvas.height / 2);
         }
     }
+    
+    function drawTargetIndicator() {
+        if (ball.vz < 0 && ball.z > 0) {
+            const dropTime = (-ball.vz - Math.sqrt(ball.vz * ball.vz - 2 * ball.gravity * ball.z)) / ball.gravity;
+            const dropX = ball.x + ball.vx * dropTime;
+            const dropY = ball.y + ball.vy * dropTime;
+
+            if (dropY > court.netY) { // Only show on player's side
+                ctx.beginPath();
+                ctx.arc(dropX, dropY, 10, 0, Math.PI * 2);
+                ctx.strokeStyle = 'rgba(255, 255, 0, 0.7)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+            }
+        }
+    }
+
 
     // --- Game Logic ---
     function update() {
         if (state.paused || !state.gameStarted || state.roundOver) return;
 
+        // Ball physics
         ball.vz += ball.gravity;
         ball.x += ball.vx;
         ball.y += ball.vy;
         ball.z += ball.vz;
 
+        // Ball hits ground
         if (ball.z < 0) {
             ball.z = 0;
-            ball.vz *= -0.7;
             pointScored(ball.y > court.netY ? 'cpu' : 'player');
         }
 
-        if (ball.x - ball.radius < court.x || ball.x + ball.radius > court.x + court.width) {
-            ball.vx *= -1;
-        }
-        if (ball.y - ball.radius < court.y || ball.y + ball.radius > court.y + court.height) {
+        // Ball out of bounds (sideways)
+        if (ball.x < court.x || ball.x > court.x + court.width) {
             pointScored(ball.y > court.netY ? 'cpu' : 'player');
         }
-
-        if (ball.y > court.netY - 5 && ball.y < court.netY + 5 && ball.z < 40) {
-            ball.vy *= -1;
+        // Ball out of bounds (long)
+        if (ball.y < court.y || ball.y > court.y + court.height) {
+            pointScored(ball.y > court.netY ? 'cpu' : 'player');
+        }
+        
+        // Net collision
+        if (Math.abs(ball.y - court.netY) < 5 && ball.z < 40) {
+            ball.vy *= -0.5; // Dampen bounce off net
+            ball.vx *= 0.8;
             ball.y += ball.vy;
         }
 
-        handleCollision(player);
+        // Player logic
+        updatePlayer();
+        // CPU logic
         updateCpuAi();
-        handleCollision(cpu);
+
+        // Collision checks
+        handleCollisions();
     }
 
-    function handleCollision(p) {
-        const dx = ball.x - p.x;
-        const dy = ball.y - p.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-
-        if (distance < p.radius + ball.radius && ball.z < 30) {
-            const angle = Math.atan2(dy, dx);
-            const speed = 3.5;
-            ball.vx = Math.cos(angle) * speed;
-            ball.vy = Math.sin(angle) * speed;
-            ball.vz = 6;
+    function updatePlayer() {
+        // Player follows the ball's predicted drop location
+        if (state.gameState === 'rally' && ball.y > court.netY) {
+             player.role = 'receiver';
+             const dropTime = (-ball.vz - Math.sqrt(ball.vz * ball.vz - 2 * ball.gravity * ball.z)) / ball.gravity;
+             const dropX = ball.x + ball.vx * dropTime;
+             player.x += (dropX - player.x) * 0.1;
+        }
+        // After toss, player becomes attacker
+        if (state.gameState === 'playerToss') {
+            player.role = 'attacker';
+            // Move to an attack position
+            player.x += (attacker.x - player.x) * 0.1;
+            player.y += (attacker.y - player.y) * 0.1;
         }
     }
 
     function updateCpuAi() {
-        const targetX = ball.x;
-        cpu.x += (targetX - cpu.x) * 0.07;
-        cpu.x = Math.max(cpu.radius + court.x, Math.min(cpu.x, court.x + court.width - cpu.radius));
+        if (state.gameState === 'rally' && ball.y < court.netY) {
+            const targetX = ball.x;
+            cpu.x += (targetX - cpu.x) * 0.08;
+        } else if (state.gameState === 'cpuToss') {
+             cpu.x += (cpuSetter.x - cpu.x) * 0.1;
+        }
     }
 
+    function handleCollisions() {
+        const ballHit = checkCollision(player, ball);
+        if (ballHit && state.gameState === 'rally') {
+            receive(player);
+        } else if (ballHit && state.gameState === 'playerAttack') {
+            attack(player, 'cpu');
+        }
+
+        if (checkCollision(setter, ball) && state.gameState === 'playerToss') {
+            toss(setter, attacker);
+        }
+        
+        const cpuHit = checkCollision(cpu, ball);
+        if (cpuHit && state.gameState === 'rally') {
+            receive(cpu);
+        } else if (cpuHit && state.gameState === 'cpuAttack') {
+            attack(cpu, 'player');
+        }
+        
+        if (checkCollision(cpuSetter, ball) && state.gameState === 'cpuToss') {
+            toss(cpuSetter, cpu);
+        }
+    }
+
+    function checkCollision(p, b) {
+        const dx = b.x - p.x;
+        const dy = b.y - p.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        return distance < p.radius + b.radius && b.z < p.radius * 2;
+    }
+    
+    function receive(receiver) {
+        console.log(receiver.id, 'received');
+        const target = receiver.id === 'player' ? setter : cpuSetter;
+        state.gameState = receiver.id === 'player' ? 'playerToss' : 'cpuToss';
+        
+        const dx = target.x - ball.x;
+        const dy = target.y - ball.y;
+        const angle = Math.atan2(dy, dx);
+        const speed = 3;
+        
+        ball.vx = Math.cos(angle) * speed;
+        ball.vy = Math.sin(angle) * speed;
+        ball.vz = 7; // Pop the ball up high
+    }
+
+    function toss(tosser, targetAttacker) {
+         console.log(tosser.id, 'tossed');
+         state.gameState = tosser.id === 'setter' ? 'playerAttack' : 'cpuAttack';
+         
+         const dx = targetAttacker.x - ball.x + (Math.random() - 0.5) * 20; // Slight random variation
+         const dy = targetAttacker.y - ball.y;
+         
+         const dist = Math.sqrt(dx*dx + dy*dy);
+         const time = 1.2; // Time for ball to reach attacker
+         
+         ball.vx = dx / time;
+         ball.vy = dy / time;
+         ball.vz = (ball.gravity * time * time * -0.5) + 5; // Calculated initial Vz to peak at apex
+    }
+
+    function attack(attacker, targetSide) {
+        console.log(attacker.id, 'attacked');
+        state.gameState = 'rally';
+        
+        const targetY = targetSide === 'cpu' ? court.y + 20 : court.y + court.height - 20;
+        const targetX = court.x + Math.random() * court.width;
+
+        const dx = targetX - ball.x;
+        const dy = targetY - ball.y;
+        
+        const angle = Math.atan2(dy, dx);
+        const speed = 6 + Math.random(); // Powerful hit
+        
+        ball.vx = Math.cos(angle) * speed;
+        ball.vy = Math.sin(angle) * speed;
+        ball.vz = 3; // Drive the ball downwards
+        
+        // Reset player role after attack
+        if(attacker.id === 'player') {
+            player.role = 'receiver';
+            // Reset position after a short delay
+            setTimeout(() => {
+                player.x = canvas.width / 2;
+                player.y = court.y + court.height * 0.85;
+            }, 300);
+        }
+    }
+
+
     function pointScored(winner) {
-        if (state.roundOver) return; // Prevent multiple scores per round
+        if (state.roundOver) return;
         state.roundOver = true;
 
         if (winner === 'player') {
@@ -161,27 +304,31 @@ document.addEventListener('DOMContentLoaded', () => {
             cpuScoreEl.textContent = state.cpuScore;
         }
 
-        setTimeout(() => startNewRound(winner), 1500);
+        setTimeout(() => startNewRound(winner), 1000);
     }
 
     function startNewRound(lastWinner) {
-        resetBall(lastWinner === 'player' ? 'cpu' : 'player');
         state.roundOver = false;
+        state.gameState = 'serve';
+        resetBall(lastWinner === 'player' ? 'cpu' : 'player');
     }
 
     function resetBall(server) {
-        ball.z = 80;
+        ball.z = 50;
         ball.vz = 0;
-        ball.vx = (Math.random() - 0.5) * 3;
-
+        
         if (server === 'player') {
             ball.x = player.x;
-            ball.y = player.y - player.radius - 10;
-            ball.vy = -4;
+            ball.y = player.y - 20;
+            ball.vx = (Math.random() - 0.5) * 2;
+            ball.vy = -5; // Serve velocity
+            state.gameState = 'rally';
         } else {
             ball.x = cpu.x;
-            ball.y = cpu.y + cpu.radius + 10;
-            ball.vy = 4;
+            ball.y = cpu.y + 20;
+            ball.vx = (Math.random() - 0.5) * 2;
+            ball.vy = 5; // Serve velocity
+            state.gameState = 'rally';
         }
     }
 
@@ -196,30 +343,52 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.fillStyle = '#4a90e2';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         drawCourt();
-        drawPlayers();
+        drawTeam();
         drawBall();
+        drawTargetIndicator();
         drawOverlay();
     }
 
     // --- Event Listeners ---
     function handleUserMove(e) {
         e.preventDefault();
-        if (!state.gameStarted || state.paused) return;
+        if (!state.gameStarted || state.paused || player.role !== 'receiver') return;
         const rect = canvas.getBoundingClientRect();
         const touch = e.touches ? e.touches[0] : e;
-        player.x = touch.clientX - rect.left;
-        player.x = Math.max(player.radius + court.x, Math.min(player.x, court.x + court.width - player.radius));
+        let targetX = touch.clientX - rect.left;
+        // Restrict movement to player's side
+        player.x = Math.max(player.radius + court.x, Math.min(targetX, court.x + court.width - player.radius));
     }
-
-    function handleCanvasClick() {
+    
+    function handleUserTap(e) {
+        e.preventDefault();
         if (!state.gameStarted) {
             state.gameStarted = true;
             startNewRound('cpu'); // CPU serves first
+            return;
+        }
+        if (state.paused) return;
+
+        // If it's the player's turn to attack, a tap will trigger the attack
+        if (state.gameState === 'playerAttack') {
+            const rect = canvas.getBoundingClientRect();
+            const touch = e.touches ? e.touches[0] : e;
+            const tapX = touch.clientX - rect.left;
+            const tapY = touch.clientY - rect.top;
+
+            // Check if tap is near the ball
+            const dx = ball.x - tapX;
+            const dy = (ball.y - ball.z) - tapY; // Check against visual ball position
+            if (Math.sqrt(dx*dx + dy*dy) < 40) {
+                 attack(player, 'cpu');
+            }
         }
     }
-    
+
     function setupEventListeners() {
-        canvas.addEventListener('click', handleCanvasClick);
+        canvas.addEventListener('touchstart', handleUserTap, { passive: false });
+        canvas.addEventListener('mousedown', handleUserTap, { passive: false });
+        
         canvas.addEventListener('touchmove', handleUserMove, { passive: false });
         canvas.addEventListener('mousemove', (e) => { if (e.buttons === 1) handleUserMove(e); });
 
@@ -237,6 +406,7 @@ document.addEventListener('DOMContentLoaded', () => {
             state.paused = false;
             state.roundOver = false;
             state.gameStarted = true;
+            player.role = 'receiver';
             pauseButton.textContent = '一時停止';
             startNewRound('cpu');
         });
