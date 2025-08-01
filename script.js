@@ -74,12 +74,18 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
             ctx.fillStyle = p.color;
             ctx.fill();
-            // Role indicator for player
-            if (p.id === player.id) {
-                ctx.fillStyle = 'white';
-                ctx.font = '10px sans-serif';
-                ctx.textAlign = 'center';
+            
+            ctx.fillStyle = 'white';
+            ctx.font = '12px sans-serif';
+            ctx.textAlign = 'center';
+
+            // Role indicator
+            if (p.id === 'player') {
                 ctx.fillText(player.role === 'receiver' ? 'R' : 'A', p.x, p.y + 4);
+            } else if (p.id === 'setter') {
+                ctx.fillText('S', p.x, p.y + 4);
+            } else if (p.id === 'attacker') {
+                ctx.fillText('A', p.x, p.y + 4);
             }
         });
     }
@@ -196,11 +202,17 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateCpuAi() {
+        // CPU receiver moves to the ball
         if (state.gameState === 'rally' && ball.y < court.netY) {
             moveTowardBall(cpu);
-        } else if (state.gameState === 'cpuToss') {
+        } 
+        // CPU setter moves to the ball, and CPU attacker gets in position
+        else if (state.gameState === 'cpuToss') {
              moveTowardBall(cpuSetter);
-             cpu.x += (cpu.x - cpu.x) * 0.1; // A bit of movement for cpu attacker
+             const targetAttackX = cpuSetter.x + 50;
+             const targetAttackY = cpuSetter.y - 20;
+             cpu.x += (targetAttackX - cpu.x) * 0.15;
+             cpu.y += (targetAttackY - cpu.y) * 0.15;
         }
     }
 
@@ -279,30 +291,28 @@ document.addEventListener('DOMContentLoaded', () => {
         const dx = target.x - ball.x;
         const dy = target.y - ball.y;
         const angle = Math.atan2(dy, dx);
-        const speed = 3.8; // Increased speed for more reliable receive
+        const speed = 5; // Increased speed for a more reliable receive
         
         ball.vx = Math.cos(angle) * speed;
         ball.vy = Math.sin(angle) * speed;
-        ball.vz = 8; // Pop the ball up higher for a more stable trajectory
+        ball.vz = 9; // Pop the ball up higher
     }
 
     function toss(tosser, targetAttacker) {
          console.log(tosser.id, 'tossed');
          state.gameState = tosser.id === 'setter' ? 'playerAttack' : 'cpuAttack';
          
-         // Target the player's actual current position for a more dynamic toss
          const targetX = targetAttacker.x;
          const targetY = targetAttacker.y;
 
          const dx = targetX - ball.x;
          const dy = targetY - ball.y;
          
-         const timeToTarget = 0.7; // A fixed time for the toss to reach the attacker
+         const timeToTarget = 0.6; // A faster, more precise toss
          
          ball.vx = dx / timeToTarget;
          ball.vy = dy / timeToTarget;
-         // Calculate the required vertical velocity to reach a peak height of 80
-         ball.vz = Math.sqrt(2 * -ball.gravity * (80 - ball.z));
+         ball.vz = 10; // A high and stable toss
     }
 
     function attack(attacker, targetSide) {
