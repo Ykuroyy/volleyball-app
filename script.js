@@ -22,6 +22,9 @@ document.addEventListener('DOMContentLoaded', () => {
         gameState: 'serve' // 'serve', 'rally', 'playerToss', 'playerAttack', 'cpuToss', 'cpuAttack'
     };
 
+    // Global variables
+    let draggedPlayer = null;
+
     // Court dimensions
     const court = {
         x: 10,
@@ -143,9 +146,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-
-    let draggedPlayer = null;
-
     // --- Game Logic ---
     function update() {
         if (state.paused || !state.gameStarted || state.roundOver) return;
@@ -155,6 +155,11 @@ document.addEventListener('DOMContentLoaded', () => {
         ball.x += ball.vx;
         ball.y += ball.vy;
         ball.z += ball.vz;
+        
+        // Debug: Log ball position every 60 frames (once per second at 60fps)
+        if (Math.random() < 0.016) {
+            console.log('Ball position:', { x: ball.x, y: ball.y, z: ball.z, vx: ball.vx, vy: ball.vy, vz: ball.vz });
+        }
 
         // Ball hits ground
         if (ball.z < 0) {
@@ -291,8 +296,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function resetBall(server) {
+        // Reset ball physics
         ball.z = 50;
         ball.vz = 0;
+        ball.vx = 0;
+        ball.vy = 0;
         
         if (server === 'player') {
             ball.x = player.x;
@@ -307,11 +315,16 @@ document.addEventListener('DOMContentLoaded', () => {
             ball.vy = 5; // Serve velocity
             state.gameState = 'rally';
         }
+        
+        // Ensure ball is visible and moving
+        console.log('Ball reset:', ball);
     }
 
     // --- Main Loop ---
     function gameLoop() {
-        update();
+        if (!state.paused && state.gameStarted) {
+            update();
+        }
         render();
         requestAnimationFrame(gameLoop);
     }
