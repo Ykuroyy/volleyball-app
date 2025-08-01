@@ -9,6 +9,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const pauseButton = document.getElementById('pause-button');
     const restartButton = document.getElementById('restart-button');
 
+    const startScreen = document.getElementById('start-screen');
+    const startButton = document.getElementById('start-button');
+
     // Game state
     let state = {
         playerScore: 0,
@@ -329,12 +332,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Event Listeners ---
     function handleTouchStart(e) {
         e.preventDefault();
-        if (!state.gameStarted) {
-            state.gameStarted = true;
-            startNewRound('cpu');
-            return;
-        }
-        if (state.paused) return;
+        if (!state.gameStarted || state.paused) return;
 
         const touch = e.touches ? e.touches[0] : e;
         const rect = canvas.getBoundingClientRect();
@@ -377,6 +375,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function setupEventListeners() {
+        startButton.addEventListener('click', () => {
+            startScreen.style.display = 'none';
+            state.gameStarted = true;
+            startNewRound('cpu');
+        });
+
         canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
         canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
         canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
@@ -402,6 +406,7 @@ document.addEventListener('DOMContentLoaded', () => {
             state.gameStarted = true;
             player.role = 'receiver';
             pauseButton.textContent = '一時停止';
+            startScreen.style.display = 'none'; // Hide start screen on restart
             startNewRound('cpu');
         });
     }
