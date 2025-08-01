@@ -184,6 +184,45 @@ document.addEventListener('DOMContentLoaded', () => {
 
     
 
+    function checkCollision(p, b) {
+        const dx = b.x - p.x;
+        const dy = b.y - p.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+        return distance < p.radius + b.radius && b.z < p.radius * 2.5;
+    }
+
+    function receive(receiver) {
+        console.log(receiver.id, 'received');
+        const target = receiver.id === 'player' ? setter : cpuSetter;
+        state.gameState = receiver.id === 'player' ? 'playerToss' : 'cpuToss';
+        
+        const dx = target.x - ball.x;
+        const dy = target.y - ball.y;
+        const angle = Math.atan2(dy, dx);
+        const speed = 6; // Increased speed for a more powerful receive
+        
+        ball.vx = Math.cos(angle) * speed;
+        ball.vy = Math.sin(angle) * speed;
+        ball.vz = 9; // Pop the ball up higher
+    }
+
+    function toss(tosser, targetAttacker) {
+         console.log(tosser.id, 'tossed');
+         state.gameState = tosser.id === 'setter' ? 'playerAttack' : 'cpuAttack';
+         
+         const targetX = targetAttacker.x;
+         const targetY = targetAttacker.y;
+
+         const dx = targetX - ball.x;
+         const dy = targetY - ball.y;
+         
+         const timeToTarget = 0.6; // A faster, more precise toss
+         
+         ball.vx = dx / timeToTarget;
+         ball.vy = dy / timeToTarget;
+         ball.vz = 10; // A high and stable toss
+    }
+
     function handleCollisions() {
         // Player team collisions
         const playerTeam = [player, setter, attacker];
