@@ -181,25 +181,39 @@ document.addEventListener('DOMContentLoaded', () => {
         // Player follows the ball's predicted drop location
         if (state.gameState === 'rally' && ball.y > court.netY) {
              player.role = 'receiver';
-             const dropTime = (-ball.vz - Math.sqrt(ball.vz * ball.vz - 2 * ball.gravity * ball.z)) / ball.gravity;
-             const dropX = ball.x + ball.vx * dropTime;
-             player.x += (dropX - player.x) * 0.1;
+             moveTowardBall(player);
         }
-        // After toss, player becomes attacker
+        // After receive, setter moves to the ball
         if (state.gameState === 'playerToss') {
             player.role = 'attacker';
-            // Move to an attack position
-            player.x += (attacker.x - player.x) * 0.1;
-            player.y += (attacker.y - player.y) * 0.1;
+            moveTowardBall(setter);
+            // Player moves to a precise attack position
+            const targetAttackX = setter.x - 50; // Position slightly to the left of the setter
+            const targetAttackY = setter.y + 20;
+            player.x += (targetAttackX - player.x) * 0.15;
+            player.y += (targetAttackY - player.y) * 0.15;
         }
     }
 
     function updateCpuAi() {
         if (state.gameState === 'rally' && ball.y < court.netY) {
-            const targetX = ball.x;
-            cpu.x += (targetX - cpu.x) * 0.08;
+            moveTowardBall(cpu);
         } else if (state.gameState === 'cpuToss') {
-             cpu.x += (cpuSetter.x - cpu.x) * 0.1;
+             moveTowardBall(cpuSetter);
+             cpu.x += (cpu.x - cpu.x) * 0.1; // A bit of movement for cpu attacker
+        }
+    }
+
+    function moveTowardBall(p) {
+        if (ball.vz < 0 && ball.z > 0) { // Only move if ball is dropping
+            const dropTime = (-ball.vz - Math.sqrt(ball.vz * ball.vz - 2 * ball.gravity * ball.z)) / ball.gravity;
+            if (dropTime > 0) {
+                const dropX = ball.x + ball.vx * dropTime;
+                p.x += (dropX - p.x) * 0.12; // A bit faster reaction
+                p.x = Math.max(p.radius + court.x, Math.min(p.x, court.x + court.width - p.radius));
+            }
+        } else { // If ball is rising, just track its X position
+            p.x += (ball.x - p.x) * 0.1;
         }
     }
 
@@ -276,17 +290,19 @@ document.addEventListener('DOMContentLoaded', () => {
          console.log(tosser.id, 'tossed');
          state.gameState = tosser.id === 'setter' ? 'playerAttack' : 'cpuAttack';
          
+         // Target the player's actual current position for a more dynamic toss
          const targetX = targetAttacker.x;
          const targetY = targetAttacker.y;
 
          const dx = targetX - ball.x;
          const dy = targetY - ball.y;
          
-         const time = 0.8; // A shorter, more consistent time for the toss
+         const timeToTarget = 0.7; // A fixed time for the toss to reach the attacker
          
-         ball.vx = dx / time;
-         ball.vy = dy / time;
-         ball.vz = 8; // A consistent upward velocity for the toss
+         ball.vx = dx / timeToTarget;
+         ball.vy = dy / timeToTarget;
+         // Calculate the required vertical velocity to reach a peak height of 80
+         ball.vz = Math.sqrt(2 * -ball.gravity * (80 - ball.z));
     }
 
     function attack(attacker, targetSide) {
