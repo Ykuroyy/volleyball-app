@@ -405,6 +405,26 @@ document.addEventListener('DOMContentLoaded', () => {
         canvas.addEventListener('touchmove', handleUserMove, { passive: false });
         canvas.addEventListener('mousemove', (e) => { if (e.buttons === 1) handleUserMove(e); });
 
+        pauseButton.addEventListener('click', () => {
+            if (!state.gameStarted) return;
+            state.paused = !state.paused;
+            pauseButton.textContent = state.paused ? '再開' : '一時停止';
+        });
+
+        restartButton.addEventListener('click', () => {
+            state.playerScore = 0;
+            state.cpuScore = 0;
+            playerScoreEl.textContent = 0;
+            cpuScoreEl.textContent = 0;
+            state.paused = false;
+            state.roundOver = false;
+            state.gameStarted = true;
+            player.role = 'receiver';
+            pauseButton.textContent = '一時停止';
+            startNewRound('cpu');
+        });
+    }
+
     // --- Initial Start ---
     setupEventListeners();
     gameLoop();
