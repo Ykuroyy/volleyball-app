@@ -141,6 +141,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
+    let draggedPlayer = null;
+
     // --- Game Logic ---
     function update() {
         if (state.paused || !state.gameStarted || state.roundOver) return;
@@ -173,174 +175,58 @@ document.addEventListener('DOMContentLoaded', () => {
             ball.y += ball.vy;
         }
 
-        // Player logic
-        updatePlayer();
         // CPU logic
         updateCpuAi();
 
         // Collision checks
         handleCollisions();
-        checkAutoAttack();
     }
 
-    function updatePlayer() {
-        // Player follows the ball's predicted drop location
-        if (state.gameState === 'rally' && ball.y > court.netY) {
-             player.role = 'receiver';
-             moveTowardBall(player);
-        }
-        // After receive, setter moves to the ball
-        if (state.gameState === 'playerToss') {
-            player.role = 'attacker';
-            moveTowardBall(setter);
-            // Player moves to a precise attack position
-            const targetAttackX = setter.x - 50; // Position slightly to the left of the setter
-            const targetAttackY = setter.y + 20;
-            player.x += (targetAttackX - player.x) * 0.15;
-            player.y += (targetAttackY - player.y) * 0.15;
-        }
-    }
-
-    function updateCpuAi() {
-        // CPU receiver moves to the ball
-        if (state.gameState === 'rally' && ball.y < court.netY) {
-            moveTowardBall(cpu);
-        } 
-        // CPU setter moves to the ball, and CPU attacker gets in position
-        else if (state.gameState === 'cpuToss') {
-             moveTowardBall(cpuSetter);
-             const targetAttackX = cpuSetter.x + 50;
-             const targetAttackY = cpuSetter.y - 20;
-             cpu.x += (targetAttackX - cpu.x) * 0.15;
-             cpu.y += (targetAttackY - cpu.y) * 0.15;
-        }
-    }
-
-    function moveTowardBall(p) {
-        if (ball.vz < 0 && ball.z > 0) { // Only move if ball is dropping
-            const dropTime = (-ball.vz - Math.sqrt(ball.vz * ball.vz - 2 * ball.gravity * ball.z)) / ball.gravity;
-            if (dropTime > 0) {
-                const dropX = ball.x + ball.vx * dropTime;
-                p.x += (dropX - p.x) * 0.12; // A bit faster reaction
-                p.x = Math.max(p.radius + court.x, Math.min(p.x, court.x + court.width - p.radius));
-            }
-        } else { // If ball is rising, just track its X position
-            p.x += (ball.x - p.x) * 0.1;
-        }
-    }
+    
 
     function handleCollisions() {
-        // Player receive
-        if (checkCollision(player, ball) && state.gameState === 'rally') {
-            receive(player);
-        }
+        // Player team collisions
+        const playerTeam = [player, setter, attacker];
+        playerTeam.forEach(p => {
+            if (checkCollision(p, ball)) {
+                if (p.id === 'player') receive(p);
+                else if (p.id === 'setter') toss(p, attacker);
+                else if (p.id === 'attacker') attack(p, 'cpu');
+            }
+        });
 
-        // Setter toss
-        if (checkCollision(setter, ball) && state.gameState === 'playerToss') {
-            toss(setter, attacker); // Toss towards the attack position object
-        }
-        
-        // CPU receive
+        // CPU team collisions (still automatic)
         if (checkCollision(cpu, ball) && state.gameState === 'rally') {
             receive(cpu);
         }
-        
-        // CPU Setter toss
         if (checkCollision(cpuSetter, ball) && state.gameState === 'cpuToss') {
-            toss(cpuSetter, cpu); // CPU itself is the attacker
+            toss(cpuSetter, cpu);
         }
-    }
-    
-    function checkAutoAttack() {
-        // Automatic player attack
-        if (state.gameState === 'playerAttack') {
-            const dx = ball.x - player.x;
-            const dy = ball.y - player.y;
-            const dist = Math.sqrt(dx*dx + dy*dy);
-            
-            // Check if ball is close, descending, and at a hittable height
-            if (dist < player.radius + 15 && ball.vz < 0 && ball.z > 35 && ball.z < 70) {
-                attack(player, 'cpu');
-            }
-        }
-        // Automatic CPU attack
         if (state.gameState === 'cpuAttack') {
             const dx = ball.x - cpu.x;
             const dy = ball.y - cpu.y;
-            const dist = Math.sqrt(dx*dx + dy*dy);
-            
-            if (dist < cpu.radius + 15 && ball.vz < 0 && ball.z > 35 && ball.z < 70) {
+            if (Math.sqrt(dx*dx+dy*dy) < cpu.radius + 15 && ball.vz < 0 && ball.z < 70) {
                 attack(cpu, 'player');
             }
         }
     }
-
-
-    function checkCollision(p, b) {
-        const dx = b.x - p.x;
-        const dy = b.y - p.y;
-        const distance = Math.sqrt(dx * dx + dy * dy);
-        return distance < p.radius + b.radius && b.z < p.radius * 2.5;
-    }
     
-    function receive(receiver) {
-        console.log(receiver.id, 'received');
-        const target = receiver.id === 'player' ? setter : cpuSetter;
-        state.gameState = receiver.id === 'player' ? 'playerToss' : 'cpuToss';
-        
-        const dx = target.x - ball.x;
-        const dy = target.y - ball.y;
-        const angle = Math.atan2(dy, dx);
-        const speed = 6; // Increased speed for a more powerful receive
-        
-        ball.vx = Math.cos(angle) * speed;
-        ball.vy = Math.sin(angle) * speed;
-        ball.vz = 9; // Pop the ball up higher
-    }
-
-    function toss(tosser, targetAttacker) {
-         console.log(tosser.id, 'tossed');
-         state.gameState = tosser.id === 'setter' ? 'playerAttack' : 'cpuAttack';
-         
-         const targetX = targetAttacker.x;
-         const targetY = targetAttacker.y;
-
-         const dx = targetX - ball.x;
-         const dy = targetY - ball.y;
-         
-         const timeToTarget = 0.6; // A faster, more precise toss
-         
-         ball.vx = dx / timeToTarget;
-         ball.vy = dy / timeToTarget;
-         ball.vz = 10; // A high and stable toss
-    }
-
-    function attack(attacker, targetSide) {
-        console.log(attacker.id, 'attacked');
+    function attack(p, targetSide) {
+        console.log(p.id, 'attacked');
         state.gameState = 'rally';
         
         const targetY = targetSide === 'cpu' ? court.y + 20 : court.y + court.height - 20;
-        const targetX = court.x + 15 + Math.random() * (court.width - 30); // Aim within the court
+        const targetX = court.x + 15 + Math.random() * (court.width - 30);
 
         const dx = targetX - ball.x;
         const dy = targetY - ball.y;
         
         const angle = Math.atan2(dy, dx);
-        const speed = 7 + Math.random(); // Powerful hit
+        const speed = 8 + Math.random() * 2; // More powerful attack
         
         ball.vx = Math.cos(angle) * speed;
         ball.vy = Math.sin(angle) * speed;
-        ball.vz = 2; // Drive the ball downwards
-        
-        // Reset player role after attack
-        if(attacker.id === 'player') {
-            player.role = 'receiver';
-            // Reset position after a short delay
-            setTimeout(() => {
-                player.x = canvas.width / 2;
-                player.y = court.y + court.height * 0.85;
-            }, 300);
-        }
+        ball.vz = 3; // Drive the ball downwards
     }
 
 
@@ -402,34 +288,64 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     // --- Event Listeners ---
-    function handleUserMove(e) {
-        e.preventDefault();
-        if (!state.gameStarted || state.paused || player.role !== 'receiver') return;
-        const rect = canvas.getBoundingClientRect();
-        const touch = e.touches ? e.touches[0] : e;
-        let targetX = touch.clientX - rect.left;
-        // Restrict movement to player's side
-        player.x = Math.max(player.radius + court.x, Math.min(targetX, court.x + court.width - player.radius));
-    }
-    
-    function handleUserTap(e) {
+    function handleTouchStart(e) {
         e.preventDefault();
         if (!state.gameStarted) {
             state.gameStarted = true;
-            startNewRound('cpu'); // CPU serves first
+            startNewRound('cpu');
             return;
         }
         if (state.paused) return;
 
-        // Attack is now automatic, so this function only handles starting the game.
+        const touch = e.touches ? e.touches[0] : e;
+        const rect = canvas.getBoundingClientRect();
+        const touchX = touch.clientX - rect.left;
+        const touchY = touch.clientY - rect.top;
+
+        // Find which player is being touched
+        const team = [player, setter, attacker];
+        for (const p of team) {
+            const dx = touchX - p.x;
+            const dy = touchY - p.y;
+            if (Math.sqrt(dx * dx + dy * dy) < p.radius + 20) { // Generous touch area
+                draggedPlayer = p;
+                break;
+            }
+        }
+    }
+
+    function handleTouchMove(e) {
+        e.preventDefault();
+        if (!draggedPlayer || state.paused) return;
+
+        const touch = e.touches ? e.touches[0] : e;
+        const rect = canvas.getBoundingClientRect();
+        const touchX = touch.clientX - rect.left;
+        const touchY = touch.clientY - rect.top;
+
+        // Move the dragged player
+        draggedPlayer.x = touchX;
+        draggedPlayer.y = touchY;
+
+        // Clamp position to their side of the court
+        draggedPlayer.x = Math.max(draggedPlayer.radius + court.x, Math.min(draggedPlayer.x, court.x + court.width - draggedPlayer.radius));
+        draggedPlayer.y = Math.max(court.netY + draggedPlayer.radius, Math.min(draggedPlayer.y, court.y + court.height - draggedPlayer.radius));
+    }
+
+    function handleTouchEnd(e) {
+        e.preventDefault();
+        draggedPlayer = null;
     }
 
     function setupEventListeners() {
-        canvas.addEventListener('touchstart', handleUserTap, { passive: false });
-        canvas.addEventListener('mousedown', handleUserTap, { passive: false });
-        
-        canvas.addEventListener('touchmove', handleUserMove, { passive: false });
-        canvas.addEventListener('mousemove', (e) => { if (e.buttons === 1) handleUserMove(e); });
+        canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+        canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+        canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
+
+        canvas.addEventListener('mousedown', handleTouchStart, { passive: false });
+        canvas.addEventListener('mousemove', handleTouchMove, { passive: false });
+        canvas.addEventListener('mouseup', handleTouchEnd, { passive: false });
+        canvas.addEventListener('mouseleave', handleTouchEnd, { passive: false });
 
         pauseButton.addEventListener('click', () => {
             if (!state.gameStarted) return;
