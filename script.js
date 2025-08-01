@@ -174,6 +174,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Collision checks
         handleCollisions();
+        checkAutoAttack();
     }
 
     function updatePlayer() {
@@ -203,34 +204,57 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleCollisions() {
-        const ballHit = checkCollision(player, ball);
-        if (ballHit && state.gameState === 'rally') {
+        // Player receive
+        if (checkCollision(player, ball) && state.gameState === 'rally') {
             receive(player);
-        } else if (ballHit && state.gameState === 'playerAttack') {
-            attack(player, 'cpu');
         }
 
+        // Setter toss
         if (checkCollision(setter, ball) && state.gameState === 'playerToss') {
-            toss(setter, attacker);
+            toss(setter, attacker); // Toss towards the attack position object
         }
         
-        const cpuHit = checkCollision(cpu, ball);
-        if (cpuHit && state.gameState === 'rally') {
+        // CPU receive
+        if (checkCollision(cpu, ball) && state.gameState === 'rally') {
             receive(cpu);
-        } else if (cpuHit && state.gameState === 'cpuAttack') {
-            attack(cpu, 'player');
         }
         
+        // CPU Setter toss
         if (checkCollision(cpuSetter, ball) && state.gameState === 'cpuToss') {
-            toss(cpuSetter, cpu);
+            toss(cpuSetter, cpu); // CPU itself is the attacker
         }
     }
+    
+    function checkAutoAttack() {
+        // Automatic player attack
+        if (state.gameState === 'playerAttack') {
+            const dx = ball.x - player.x;
+            const dy = ball.y - player.y;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            
+            // Check if ball is close, descending, and at a hittable height
+            if (dist < player.radius + 15 && ball.vz < 0 && ball.z > 35 && ball.z < 70) {
+                attack(player, 'cpu');
+            }
+        }
+        // Automatic CPU attack
+        if (state.gameState === 'cpuAttack') {
+            const dx = ball.x - cpu.x;
+            const dy = ball.y - cpu.y;
+            const dist = Math.sqrt(dx*dx + dy*dy);
+            
+            if (dist < cpu.radius + 15 && ball.vz < 0 && ball.z > 35 && ball.z < 70) {
+                attack(cpu, 'player');
+            }
+        }
+    }
+
 
     function checkCollision(p, b) {
         const dx = b.x - p.x;
         const dy = b.y - p.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
-        return distance < p.radius + b.radius && b.z < p.radius * 2;
+        return distance < p.radius + b.radius && b.z < p.radius * 2.5;
     }
     
     function receive(receiver) {
@@ -241,26 +265,28 @@ document.addEventListener('DOMContentLoaded', () => {
         const dx = target.x - ball.x;
         const dy = target.y - ball.y;
         const angle = Math.atan2(dy, dx);
-        const speed = 3;
+        const speed = 3.8; // Increased speed for more reliable receive
         
         ball.vx = Math.cos(angle) * speed;
         ball.vy = Math.sin(angle) * speed;
-        ball.vz = 7; // Pop the ball up high
+        ball.vz = 8; // Pop the ball up higher for a more stable trajectory
     }
 
     function toss(tosser, targetAttacker) {
          console.log(tosser.id, 'tossed');
          state.gameState = tosser.id === 'setter' ? 'playerAttack' : 'cpuAttack';
          
-         const dx = targetAttacker.x - ball.x + (Math.random() - 0.5) * 20; // Slight random variation
-         const dy = targetAttacker.y - ball.y;
+         const targetX = targetAttacker.x;
+         const targetY = targetAttacker.y;
+
+         const dx = targetX - ball.x;
+         const dy = targetY - ball.y;
          
-         const dist = Math.sqrt(dx*dx + dy*dy);
-         const time = 1.2; // Time for ball to reach attacker
+         const time = 0.8; // A shorter, more consistent time for the toss
          
          ball.vx = dx / time;
          ball.vy = dy / time;
-         ball.vz = (ball.gravity * time * time * -0.5) + 5; // Calculated initial Vz to peak at apex
+         ball.vz = 8; // A consistent upward velocity for the toss
     }
 
     function attack(attacker, targetSide) {
@@ -268,17 +294,17 @@ document.addEventListener('DOMContentLoaded', () => {
         state.gameState = 'rally';
         
         const targetY = targetSide === 'cpu' ? court.y + 20 : court.y + court.height - 20;
-        const targetX = court.x + Math.random() * court.width;
+        const targetX = court.x + 15 + Math.random() * (court.width - 30); // Aim within the court
 
         const dx = targetX - ball.x;
         const dy = targetY - ball.y;
         
         const angle = Math.atan2(dy, dx);
-        const speed = 6 + Math.random(); // Powerful hit
+        const speed = 7 + Math.random(); // Powerful hit
         
         ball.vx = Math.cos(angle) * speed;
         ball.vy = Math.sin(angle) * speed;
-        ball.vz = 3; // Drive the ball downwards
+        ball.vz = 2; // Drive the ball downwards
         
         // Reset player role after attack
         if(attacker.id === 'player') {
@@ -369,20 +395,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         if (state.paused) return;
 
-        // If it's the player's turn to attack, a tap will trigger the attack
-        if (state.gameState === 'playerAttack') {
-            const rect = canvas.getBoundingClientRect();
-            const touch = e.touches ? e.touches[0] : e;
-            const tapX = touch.clientX - rect.left;
-            const tapY = touch.clientY - rect.top;
-
-            // Check if tap is near the ball
-            const dx = ball.x - tapX;
-            const dy = (ball.y - ball.z) - tapY; // Check against visual ball position
-            if (Math.sqrt(dx*dx + dy*dy) < 40) {
-                 attack(player, 'cpu');
-            }
-        }
+        // Attack is now automatic, so this function only handles starting the game.
     }
 
     function setupEventListeners() {
@@ -391,26 +404,6 @@ document.addEventListener('DOMContentLoaded', () => {
         
         canvas.addEventListener('touchmove', handleUserMove, { passive: false });
         canvas.addEventListener('mousemove', (e) => { if (e.buttons === 1) handleUserMove(e); });
-
-        pauseButton.addEventListener('click', () => {
-            if (!state.gameStarted) return;
-            state.paused = !state.paused;
-            pauseButton.textContent = state.paused ? '再開' : '一時停止';
-        });
-
-        restartButton.addEventListener('click', () => {
-            state.playerScore = 0;
-            state.cpuScore = 0;
-            playerScoreEl.textContent = 0;
-            cpuScoreEl.textContent = 0;
-            state.paused = false;
-            state.roundOver = false;
-            state.gameStarted = true;
-            player.role = 'receiver';
-            pauseButton.textContent = '一時停止';
-            startNewRound('cpu');
-        });
-    }
 
     // --- Initial Start ---
     setupEventListeners();
