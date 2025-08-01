@@ -41,7 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Player, Setter, Attacker properties
     const player = { id: 'player', x: canvas.width / 2, y: court.y + court.height * 0.85, radius: 15, color: '#ff3b30', role: 'receiver' };
-    const setter = { id: 'setter', x: canvas.width * 0.7, y: court.y + court.height * 0.6, radius: 14, color: '#ff9500' };
+    const setter = { id: 'setter', x: canvas.width * 0.7, y: court.y + court.height * 0.55, radius: 14, color: '#ff9500' };
     const attacker = { id: 'attacker', x: canvas.width * 0.3, y: court.y + court.height * 0.6, radius: 16, color: '#ff2d55' };
 
     const cpu = { id: 'cpu', x: canvas.width / 2, y: court.y + court.height * 0.25, radius: 15, color: '#007aff' };
@@ -291,7 +291,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const dx = target.x - ball.x;
         const dy = target.y - ball.y;
         const angle = Math.atan2(dy, dx);
-        const speed = 5; // Increased speed for a more reliable receive
+        const speed = 6; // Increased speed for a more powerful receive
         
         ball.vx = Math.cos(angle) * speed;
         ball.vy = Math.sin(angle) * speed;
