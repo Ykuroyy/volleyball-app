@@ -210,7 +210,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const dx = b.x - p.x;
         const dy = b.y - p.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
-        return distance < p.radius + b.radius && b.z < p.radius * 2.5;
+        // より厳密な衝突判定
+        return distance < p.radius + b.radius && b.z < p.radius * 2 && b.z >= 0;
     }
 
     function receive(receiver) {
@@ -237,29 +238,33 @@ document.addEventListener('DOMContentLoaded', () => {
 
          const dx = targetX - ball.x;
          const dy = targetY - ball.y;
-         const distance = Math.sqrt(dx * dx + dy * dy);
+         const angle = Math.atan2(dy, dx);
+         const speed = 4; // 適度な速度でトス
          
-         // 距離に応じてトスの高さと速度を調整
-         const timeToTarget = 0.8 + distance / 500; // 距離に応じて時間を調整
+         ball.vx = Math.cos(angle) * speed;
+         ball.vy = Math.sin(angle) * speed;
+         ball.vz = 10; // 高めのトス
          
-         ball.vx = dx / (timeToTarget * 60); // 60fpsでの計算
-         ball.vy = dy / (timeToTarget * 60);
-         ball.vz = 12; // 高めのトス
-         
-         console.log('Toss calculation:', { dx, dy, distance, vx: ball.vx, vy: ball.vy, vz: ball.vz });
+         console.log('Toss calculation:', { dx, dy, angle, vx: ball.vx, vy: ball.vy, vz: ball.vz });
     }
 
     function handleCollisions() {
+        // 一度の衝突で複数回処理されないようにフラグを追加
+        let collisionHandled = false;
+        
         // Player team collisions - ゲーム状態に応じて判定
-        if (state.gameState === 'rally' && checkCollision(player, ball)) {
+        if (state.gameState === 'rally' && checkCollision(player, ball) && !collisionHandled) {
             receive(player);
+            collisionHandled = true;
         }
-        else if (state.gameState === 'playerToss' && checkCollision(setter, ball)) {
+        else if (state.gameState === 'playerToss' && checkCollision(setter, ball) && !collisionHandled) {
             console.log('Setter collision detected! gameState:', state.gameState);
             toss(setter, attacker);
+            collisionHandled = true;
         }
-        else if (state.gameState === 'playerAttack' && checkCollision(attacker, ball)) {
+        else if (state.gameState === 'playerAttack' && checkCollision(attacker, ball) && !collisionHandled) {
             attack(attacker, 'cpu');
+            collisionHandled = true;
         }
 
         // CPU team collisions (still automatic)
