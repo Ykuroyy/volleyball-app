@@ -176,6 +176,10 @@ document.addEventListener('DOMContentLoaded', () => {
         // Debug: Log ball position every 60 frames (once per second at 60fps)
         if (Math.random() < 0.016) {
             console.log('Ball position:', { x: ball.x, y: ball.y, z: ball.z, vx: ball.vx, vy: ball.vy, vz: ball.vz });
+            console.log('Game state:', state.gameState);
+            if (state.gameState === 'playerAttack') {
+                console.log('Waiting for attacker collision. Attacker:', { x: attacker.x, y: attacker.y });
+            }
         }
 
         // Ball hits ground
@@ -211,7 +215,20 @@ document.addEventListener('DOMContentLoaded', () => {
         const dy = b.y - p.y;
         const distance = Math.sqrt(dx * dx + dy * dy);
         // より厳密な衝突判定
-        return distance < p.radius + b.radius && b.z < p.radius * 2 && b.z >= 0;
+        const result = distance < p.radius + b.radius && b.z < p.radius * 2 && b.z >= 0;
+        
+        // アタッカーの場合はデバッグ出力
+        if (p.id === 'attacker' && state.gameState === 'playerAttack') {
+            console.log('Attacker collision check:', {
+                distance,
+                threshold: p.radius + b.radius,
+                ballZ: b.z,
+                maxZ: p.radius * 2,
+                result
+            });
+        }
+        
+        return result;
     }
 
     function receive(receiver) {
@@ -239,13 +256,17 @@ document.addEventListener('DOMContentLoaded', () => {
          const dx = targetX - ball.x;
          const dy = targetY - ball.y;
          const angle = Math.atan2(dy, dx);
-         const speed = 4; // 適度な速度でトス
+         const speed = 3; // 少し遅めの速度でトス
          
          ball.vx = Math.cos(angle) * speed;
          ball.vy = Math.sin(angle) * speed;
-         ball.vz = 10; // 高めのトス
+         ball.vz = 8; // 少し低めのトスで届きやすく
          
-         console.log('Toss calculation:', { dx, dy, angle, vx: ball.vx, vy: ball.vy, vz: ball.vz });
+         console.log('Toss calculation:', { 
+             from: { x: ball.x, y: ball.y }, 
+             to: { x: targetX, y: targetY },
+             dx, dy, angle, vx: ball.vx, vy: ball.vy, vz: ball.vz 
+         });
     }
 
     function handleCollisions() {
