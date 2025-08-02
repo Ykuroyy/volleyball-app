@@ -11,6 +11,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const startScreen = document.getElementById('start-screen');
     const startButton = document.getElementById('start-button');
+    
+    // Debug: Check if all DOM elements are found
+    console.log('DOM Elements check:');
+    console.log('playerScoreEl:', playerScoreEl);
+    console.log('cpuScoreEl:', cpuScoreEl);
+    console.log('pauseButton:', pauseButton);
+    console.log('restartButton:', restartButton);
+    console.log('startScreen:', startScreen);
+    console.log('startButton:', startButton);
 
     // Game state
     let state = {
@@ -229,15 +238,16 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function handleCollisions() {
-        // Player team collisions
-        const playerTeam = [player, setter, attacker];
-        playerTeam.forEach(p => {
-            if (checkCollision(p, ball)) {
-                if (p.id === 'player') receive(p);
-                else if (p.id === 'setter') toss(p, attacker);
-                else if (p.id === 'attacker') attack(p, 'cpu');
-            }
-        });
+        // Player team collisions - ゲーム状態に応じて判定
+        if (state.gameState === 'rally' && checkCollision(player, ball)) {
+            receive(player);
+        }
+        else if (state.gameState === 'playerToss' && checkCollision(setter, ball)) {
+            toss(setter, attacker);
+        }
+        else if (state.gameState === 'playerAttack' && checkCollision(attacker, ball)) {
+            attack(attacker, 'cpu');
+        }
 
         // CPU team collisions (still automatic)
         if (checkCollision(cpu, ball) && state.gameState === 'rally') {
@@ -291,7 +301,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function startNewRound(lastWinner) {
         state.roundOver = false;
-        state.gameState = 'serve';
+        state.gameState = 'rally';  // 即座にラリー状態にする
         resetBall(lastWinner === 'player' ? 'cpu' : 'player');
     }
 
@@ -385,11 +395,24 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function setupEventListeners() {
-        startButton.addEventListener('click', () => {
-            startScreen.style.display = 'none';
-            state.gameStarted = true;
-            startNewRound('cpu');
-        });
+        // Debug: Check if elements exist
+        console.log('Start button:', startButton);
+        console.log('Start screen:', startScreen);
+        
+        if (startButton) {
+            startButton.addEventListener('click', () => {
+                console.log('Start button clicked!');
+                if (startScreen) {
+                    startScreen.style.display = 'none';
+                }
+                state.gameStarted = true;
+                state.paused = false;
+                startNewRound('cpu');
+                console.log('Game started:', state);
+            });
+        } else {
+            console.error('Start button not found!');
+        }
 
         canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
         canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
@@ -424,4 +447,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- Initial Start ---
     setupEventListeners();
     gameLoop();
+    
+    // Debug: Check initial state
+    console.log('Initial game state:', state);
+    console.log('Start screen display:', startScreen ? startScreen.style.display : 'startScreen not found');
 });
