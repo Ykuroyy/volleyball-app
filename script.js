@@ -137,6 +137,14 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.textAlign = 'center';
             ctx.fillText('一時停止中', canvas.width / 2, canvas.height / 2);
         }
+        
+        // デバッグ用：ゲーム状態を表示
+        if (state.gameStarted) {
+            ctx.fillStyle = 'white';
+            ctx.font = '12px sans-serif';
+            ctx.textAlign = 'left';
+            ctx.fillText('State: ' + state.gameState, 10, 20);
+        }
     }
     
     function drawTargetIndicator() {
@@ -221,7 +229,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function toss(tosser, targetAttacker) {
-         console.log(tosser.id, 'tossed');
+         console.log(tosser.id, 'tossed to', targetAttacker.id);
          state.gameState = tosser.id === 'setter' ? 'playerAttack' : 'cpuAttack';
          
          const targetX = targetAttacker.x;
@@ -229,12 +237,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
          const dx = targetX - ball.x;
          const dy = targetY - ball.y;
+         const distance = Math.sqrt(dx * dx + dy * dy);
          
-         const timeToTarget = 0.6; // A faster, more precise toss
+         // 距離に応じてトスの高さと速度を調整
+         const timeToTarget = 0.8 + distance / 500; // 距離に応じて時間を調整
          
-         ball.vx = dx / timeToTarget;
-         ball.vy = dy / timeToTarget;
-         ball.vz = 10; // A high and stable toss
+         ball.vx = dx / (timeToTarget * 60); // 60fpsでの計算
+         ball.vy = dy / (timeToTarget * 60);
+         ball.vz = 12; // 高めのトス
+         
+         console.log('Toss calculation:', { dx, dy, distance, vx: ball.vx, vy: ball.vy, vz: ball.vz });
     }
 
     function handleCollisions() {
@@ -243,6 +255,7 @@ document.addEventListener('DOMContentLoaded', () => {
             receive(player);
         }
         else if (state.gameState === 'playerToss' && checkCollision(setter, ball)) {
+            console.log('Setter collision detected! gameState:', state.gameState);
             toss(setter, attacker);
         }
         else if (state.gameState === 'playerAttack' && checkCollision(attacker, ball)) {
